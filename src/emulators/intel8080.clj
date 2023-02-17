@@ -33,9 +33,18 @@
   (let [ instr (mem (register :PC))
         ddd   (register-map (ddd-bits instr))
         sss   (register-map (sss-bits instr)) ]
-    (list (assoc register ddd (register sss)) mem io)))
+    (list (assoc register ddd (register sss) :PC (+ 1 (register :PC)) mem io))))
 
 
+(defn mov-r-n [register mem io]
+  (let [ addr (+ (* 256 (register :H)) (register :L))
+         ddd  (register-map (ddd-bits (mem (register :PC))))]
+    (list
+     (assoc register ddd (mem addr) :PC (+ 1 (register :PC)))
+     mem
+     io)))
+         
+        
 (defn- error-func [a b c] "Something went bad")
 
 (defn instruction-dispatcher
@@ -43,7 +52,8 @@
   [instr]
   (cond
     (and (= 0x40 (bit-and 0x40 instr)) (not (= 0x30 (bit-and 0x30 instr))) (not (= 0x06 (bit-and 0x06 instr)))) mov-r1-r2
-     :else error-func))
+    (and (= 0x46 (bit-and 0x46 instr)) (not (= 0x30 (bit-and 0x39 instr)))) mov-r-n
+    :else error-func))
 
 
   
