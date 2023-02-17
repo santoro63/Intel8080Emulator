@@ -21,10 +21,20 @@
 (def register-pair-map { 00 :BC 01 :DE 02 :HL 03 :SP })
 
 
+;;--------------------------------------------------------------------
+;; Helper Functions
+;;--------------------------------------------------------------------
 
 (defn- ddd-bits [instr] (bit-shift-right (bit-and 2r00111000 instr) 3))
 (defn- sss-bits [instr] (bit-and 2r00000111 instr))
 
+
+(defn reg-op [register-set register op value]
+  (assoc register-set register (op value (register-set register))))
+
+
+(defn- get-long [register labelH labelL ]
+  (+ (* 256 (register labelH)) (register labelL)))
 
 ;;------------------------------
 ;; Data Transfer Group
@@ -36,23 +46,54 @@
     (list (assoc register ddd (register sss) :PC (+ 1 (register :PC)) mem io))))
 
 
-(defn mov-r-n [register mem io]
-  (let [ addr (+ (* 256 (register :H)) (register :L))
+(defn- mov-r-n [register mem io]
+  (let [ addr (get-long register :H :L)
          ddd  (register-map (ddd-bits (mem (register :PC))))]
     (list
      (assoc register ddd (mem addr) :PC (+ 1 (register :PC)))
      mem
      io)))
-         
+
+(defn mov-n-r [register mem io]
+  (let [ addr (get-long register :H :L)
+        sss  (register-map (sss-bits (mem (register :PC))))
+        ]
+    (list
+     (assoc register :PC (+ 1 (register :PC)))
+     (assoc mem addr (register sss))
+     io)))
+
+
+(defn mvi-r-d [register mem io]
+  (let [ ddd (register-map (ddd-bits (mem (register :PC))))
+        val (mem (+ 1 (register :PC)))
+        ]
+    (list
+     (assoc register ddd val :PC (+ 2 (register :PC)))
+     mem
+     io)))
         
-(defn- error-func [a b c] "Something went bad")
+(defn mvi-m-d [register mem io]
+  (let [ addr (get-long register :H :L)
+        val  (mem (+ 1 (register :PC)))
+        ]
+    (list
+     (reg-op register :PC + 2)
+     (assoc mem addr val)
+     io)))
+                            
+(defn- error-func [regs mem io]
+  (throw (IllegalArgumentException. (str "Unrecognized instruction " (mem (regs :PC))))))
 
 (defn instruction-dispatcher
   "Returns the funciton appropriate for processing instruction."
   [instr]
   (cond
-    (and (= 0x40 (bit-and 0x40 instr)) (not (= 0x30 (bit-and 0x30 instr))) (not (= 0x06 (bit-and 0x06 instr)))) mov-r1-r2
-    (and (= 0x46 (bit-and 0x46 instr)) (not (= 0x30 (bit-and 0x39 instr)))) mov-r-n
+    (and (= 0x40 (bit-and 0xC0 instr)) (not (= 0x30 (bit-and 0x38 instr))) (not (= 0x06 (bit-and 0x07 instr)))) mov-r1-r2
+    (and (= 0x46 (bit-and 0xC7 instr)) (not (= 0x30 (bit-and 0x38 instr)))) mov-r-n
+    (and (= 0x70 (bit-and 0xF8 instr)) (not (= 0x06 (bit-and 0x07 instr)))) mov-n-r
+    (and (= 0x06 (bit-and 0xC7 instr)) (not (= 0x30 (bit-and 0x38 instr)))) mvi-r-d
+    (= 0x36 instr) mvi-m-d
     :else error-func))
 
 
