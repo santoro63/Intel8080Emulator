@@ -25,8 +25,8 @@
 ;; Helper Functions
 ;;--------------------------------------------------------------------
 
-(defn- ddd-bits [instr] (bit-shift-right (bit-and 2r00111000 instr) 3))
-(defn- sss-bits [instr] (bit-and 2r00000111 instr))
+(defn- ddd-reg [instr] (register-map (bit-shift-right (bit-and 2r00111000 instr) 3)))
+(defn- sss-reg [instr] (register-map (bit-and 2r00000111 instr)))
 
 
 (defn reg-op [register-set register op value]
@@ -36,36 +36,47 @@
 (defn- get-long [register labelH labelL ]
   (+ (* 256 (register labelH)) (register labelL)))
 
+
+(defn incr-pc
+  "Increments the value of the program counter"
+  ( [register val]
+   (reg-op register :PC + val))
+
+  ( [register]
+   (incr-pc register 1))
+
+)
+
 ;;------------------------------
 ;; Data Transfer Group
 ;;------------------------------
 (defn- mov-r1-r2 [ register mem io ]
   (let [ instr (mem (register :PC))
-        ddd   (register-map (ddd-bits instr))
-        sss   (register-map (sss-bits instr)) ]
+        ddd   (ddd-reg instr)
+        sss   (sss-reg instr)]
     (list (assoc register ddd (register sss) :PC (+ 1 (register :PC)) mem io))))
 
 
 (defn- mov-r-n [register mem io]
   (let [ addr (get-long register :H :L)
-         ddd  (register-map (ddd-bits (mem (register :PC))))]
+         ddd  (ddd-reg (mem (register :PC)))]
     (list
      (assoc register ddd (mem addr) :PC (+ 1 (register :PC)))
      mem
      io)))
 
-(defn mov-n-r [register mem io]
+(defn- mov-n-r [register mem io]
   (let [ addr (get-long register :H :L)
-        sss  (register-map (sss-bits (mem (register :PC))))
+        sss  (sss-reg (mem (register :PC)))
         ]
     (list
-     (assoc register :PC (+ 1 (register :PC)))
+     (incr-pc register)
      (assoc mem addr (register sss))
      io)))
 
 
-(defn mvi-r-d [register mem io]
-  (let [ ddd (register-map (ddd-bits (mem (register :PC))))
+(defn- mvi-r-d [register mem io]
+  (let [ ddd (ddd-reg (mem (register :PC)))
         val (mem (+ 1 (register :PC)))
         ]
     (list
@@ -73,17 +84,18 @@
      mem
      io)))
         
-(defn mvi-m-d [register mem io]
+(defn- mvi-m-d [register mem io]
   (let [ addr (get-long register :H :L)
         val  (mem (+ 1 (register :PC)))
         ]
     (list
-     (reg-op register :PC + 2)
+     (incr-pc register 2)
      (assoc mem addr val)
      io)))
                             
 (defn- error-func [regs mem io]
   (throw (IllegalArgumentException. (str "Unrecognized instruction " (mem (regs :PC))))))
+
 
 (defn instruction-dispatcher
   "Returns the funciton appropriate for processing instruction."
