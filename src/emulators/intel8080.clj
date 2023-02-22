@@ -148,7 +148,29 @@
      io)
     ))
 
+(defn- ldax [regs mem io]
+  (let [ [labelH labelL] (get-rp (mem (regs :PC)))
+        mem-addr (get-long regs labelH labelL) ]
+    (list
+     (assoc regs :A (mem mem-addr) :PC (+ 1 (regs :PC)))
+     mem
+     io)))
+
+(defn- stax [regs mem io]
+  (let [ [labelH labelL] (get-rp (mem (regs :PC)))
+        mem-addr (get-long regs labelH labelL) ]
+    (list
+     (incr-pc regs 1)
+     (assoc mem mem-addr (regs :A))
+     io)
+    ))
                                              
+(defn- xchg [regs mem io]
+  (list
+   (assoc regs :H (regs :D) :D (regs :H) :L (regs :E) :E (regs :L) :PC (+ 1 (regs :PC)))
+   mem
+   io)
+  )
 
 (defn- error-func [regs mem io]
   (throw (IllegalArgumentException. (str "Unrecognized instruction " (mem (regs :PC))))))
@@ -168,6 +190,9 @@
     (= 0x32 instr) sta-m
     (= 0x2A instr) lhld
     (= 0x22 instr) shld
+    (or (= 0x0A instr) (= 0x1A instr)) ldax
+    (or (= 0x02 instr) (= 0x12 instr)) stax
+    (= 0xEB instr) xchg
     :else error-func))
 
 

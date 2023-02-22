@@ -104,5 +104,35 @@
       (t/is (= 0x33 (mem-out 0x04)))
       (t/is (= 0x22 (mem-out 0x05)))
       ))
-  
+
+  (t/testing "load mem(rp) to acc"
+    (let [ r (assoc sut/init-registers :B 0x00 :C 0x04)
+          m [0x0A 0x00 0x00 0x00 0xFF 0xDD]
+          io []
+          [r-out mem-out io-out] (sut/step r m io) ]
+      (t/is (= 0x01 (r-out :PC)))
+      (t/is (= 0xFF (r-out :A)))
+      ))
+
+  (t/testing "load mem(rp) from acc"
+    (let [ r (assoc sut/init-registers :A 0xEF :D 0x00 :E 0x03)
+          m [0x12 0x00 0x00 0x00 0x00]
+          io []
+          [r-out mem-out io-out] (sut/step r m io) ]
+      (t/is (= 0x01 (r-out :PC)))
+      (t/is (= 0xEF (mem-out 0x0003)))
+      ))
+
+  (t/testing "exchange registers HL <-> DE"
+    (let [ r (assoc sut/init-registers :D 0x01 :E 0x02 :H 0x03 :L 0x04)
+          m [0xEB]
+          io []
+          [r-out m-out io-out] (sut/step r m io) ]
+      (t/is (= 0x01 (r-out :H)))
+      (t/is (= 0x02 (r-out :L)))
+      (t/is (= 0x03 (r-out :D)))
+      (t/is (= 0x04 (r-out :E)))
+      (t/is (= 0x01 (r-out :PC)))
+      ))
+         
   )        
