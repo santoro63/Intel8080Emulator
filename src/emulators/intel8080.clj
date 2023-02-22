@@ -33,8 +33,13 @@
   (assoc register-set register (op value (register-set register))))
 
 
+(defn- to-long [hi-byte low-byte] (+ (* 256 hi-byte) low-byte))
 (defn- get-long [register labelH labelL ]
-  (+ (* 256 (register labelH)) (register labelL)))
+  (to-long (register labelH) (register labelL)))
+
+
+(defn- instr3 [mem addr]
+  [ (mem addr) (mem (+ 1 addr)) (mem (+ 2 addr)) ])
 
 
 (defn- incr-pc
@@ -101,7 +106,7 @@
         hi-byte  (mem (+ 2 addr))]
     (if (= [:SP] pair)
       (list
-       (assoc regs :SP (+ (* 256 hi-byte) low-byte) :PC (+ 3 addr))
+       (assoc regs :SP (to-long hi-byte low-byte) :PC (+ 3 addr))
        mem
        io)
       (list
@@ -110,6 +115,40 @@
        io)
       )))
 
+
+(defn- lda-m [regs mem io]
+  (let [ addr (regs :PC)
+        mem-addr (to-long (mem (+ 2 addr)) (mem (+ 1 addr))) ]
+    (list
+     (assoc regs :A (mem mem-addr) :PC (+ 3 addr))
+     mem
+     io)))
+
+(defn- sta-m [regs mem io]
+  (let [ [instr low-byte high-byte] (instr3 mem (regs :PC)) ]
+    (list
+     (incr-pc regs 3)
+     (assoc mem (to-long high-byte low-byte) (regs :A))
+     io)))
+
+(defn- lhld [regs mem io]
+  (let [ [instr low-byte high-byte ] (instr3 mem (regs :PC))
+        addr (to-long high-byte low-byte) ]
+    (list
+     (assoc regs :L (mem addr) :H (mem (+ 1 addr)) :PC (+ 3 (regs :PC)))
+     mem
+     io)))
+
+(defn- shld [regs mem io]
+  (let [ [instr low-byte high-byte] (instr3 mem (regs :PC))
+        mem-addr (to-long high-byte low-byte) ]
+    (list
+     (incr-pc regs 3)
+     (assoc mem mem-addr (regs :L) (+ 1 mem-addr) (regs :H))
+     io)
+    ))
+
+                                             
 
 (defn- error-func [regs mem io]
   (throw (IllegalArgumentException. (str "Unrecognized instruction " (mem (regs :PC))))))
@@ -125,6 +164,10 @@
     (and (= 0x06 (bit-and 0xC7 instr)) (not (= 0x30 (bit-and 0x38 instr)))) mvi-r-d
     (= 0x36 instr) mvi-m-d
     (= 0x01 (bit-and 0xCF instr)) lxi-rp-d
+    (= 0x3A instr) lda-m
+    (= 0x32 instr) sta-m
+    (= 0x2A instr) lhld
+    (= 0x22 instr) shld
     :else error-func))
 
 
