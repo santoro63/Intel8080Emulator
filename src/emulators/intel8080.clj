@@ -29,7 +29,7 @@
 (defn- sss-reg [instr] (register-map (bit-and 2r00000111 instr)))
 
 
-(defn reg-op [register-set register op value]
+(defn- reg-op [register-set register op value]
   (assoc register-set register (op value (register-set register))))
 
 
@@ -37,59 +37,59 @@
   (+ (* 256 (register labelH)) (register labelL)))
 
 
-(defn incr-pc
+(defn- incr-pc
   "Increments the value of the program counter"
-  ( [register val]
-   (reg-op register :PC + val))
+  ( [regs val]
+   (reg-op regs :PC + val))
 
-  ( [register]
-   (incr-pc register 1))
+  ( [regs]
+   (incr-pc regs 1))
 
 )
 
 ;;------------------------------
 ;; Data Transfer Group
 ;;------------------------------
-(defn- mov-r1-r2 [ register mem io ]
-  (let [ instr (mem (register :PC))
+(defn- mov-r1-r2 [ regs mem io ]
+  (let [ instr (mem (regs :PC))
         ddd   (ddd-reg instr)
         sss   (sss-reg instr)]
-    (list (assoc register ddd (register sss) :PC (+ 1 (register :PC)) mem io))))
+    (list (assoc regs ddd (regs sss) :PC (+ 1 (regs :PC)) mem io))))
 
 
-(defn- mov-r-n [register mem io]
-  (let [ addr (get-long register :H :L)
-         ddd  (ddd-reg (mem (register :PC)))]
+(defn- mov-r-n [regs mem io]
+  (let [ addr (get-long regs :H :L)
+         ddd  (ddd-reg (mem (regs :PC)))]
     (list
-     (assoc register ddd (mem addr) :PC (+ 1 (register :PC)))
+     (assoc regs ddd (mem addr) :PC (+ 1 (regs :PC)))
      mem
      io)))
 
-(defn- mov-n-r [register mem io]
-  (let [ addr (get-long register :H :L)
-        sss  (sss-reg (mem (register :PC)))
+(defn- mov-n-r [regs mem io]
+  (let [ addr (get-long regs :H :L)
+        sss  (sss-reg (mem (regs :PC)))
         ]
     (list
-     (incr-pc register)
-     (assoc mem addr (register sss))
+     (incr-pc regs)
+     (assoc mem addr (regs sss))
      io)))
 
 
-(defn- mvi-r-d [register mem io]
-  (let [ ddd (ddd-reg (mem (register :PC)))
-        val (mem (+ 1 (register :PC)))
+(defn- mvi-r-d [regs mem io]
+  (let [ ddd (ddd-reg (mem (regs :PC)))
+        val (mem (+ 1 (regs :PC)))
         ]
     (list
-     (assoc register ddd val :PC (+ 2 (register :PC)))
+     (assoc regs ddd val :PC (+ 2 (regs :PC)))
      mem
      io)))
         
-(defn- mvi-m-d [register mem io]
-  (let [ addr (get-long register :H :L)
-        val  (mem (+ 1 (register :PC)))
+(defn- mvi-m-d [regs mem io]
+  (let [ addr (get-long regs :H :L)
+        val  (mem (+ 1 (regs :PC)))
         ]
     (list
-     (incr-pc register 2)
+     (incr-pc regs 2)
      (assoc mem addr val)
      io)))
                             
@@ -98,7 +98,7 @@
 
 
 (defn instruction-dispatcher
-  "Returns the funciton appropriate for processing instruction."
+  "Returns the function appropriate for processing instruction."
   [instr]
   (cond
     (and (= 0x40 (bit-and 0xC0 instr)) (not (= 0x30 (bit-and 0x38 instr))) (not (= 0x06 (bit-and 0x07 instr)))) mov-r1-r2
@@ -112,9 +112,9 @@
   
 (defn step
   "Executes the current instruction on the CPU returning new register, memory and io states"
-  [ registers mem io ]
-  (let [instruction (mem (registers :PC))]
-    ((instruction-dispatcher instruction) registers mem io)))
+  [ regs mem io ]
+  (let [instruction (mem (regs :PC))]
+    ((instruction-dispatcher instruction) regs mem io)))
 
 ;; collection of instructions
 
