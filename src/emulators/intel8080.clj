@@ -18,7 +18,7 @@
 
 (def register-map { 07 :A 00 :B 01 :C 02 :D 03 :E 04 :H 05 :L } )
 
-(def register-pair-map { 00 :BC 01 :DE 02 :HL 03 :SP })
+(def register-pair-map { 00 [:B :C] 01 [:D :E] 02 [:H :L] 03 [:SP] })
 
 
 ;;--------------------------------------------------------------------
@@ -27,7 +27,7 @@
 
 (defn- ddd-reg [instr] (register-map (bit-shift-right (bit-and 2r00111000 instr) 3)))
 (defn- sss-reg [instr] (register-map (bit-and 2r00000111 instr)))
-
+(defn- get-rp  [instr]  (register-pair-map (bit-shift-right (bit-and 0x30 instr) 4)))
 
 (defn- reg-op [register-set register op value]
   (assoc register-set register (op value (register-set register))))
@@ -92,7 +92,25 @@
      (incr-pc regs 2)
      (assoc mem addr val)
      io)))
-                            
+
+
+(defn- lxi-rp-d [regs mem io]
+  (let [ addr (regs :PC)
+        pair (get-rp (mem addr))
+        low-byte (mem (+ 1 addr))
+        hi-byte  (mem (+ 2 addr))]
+    (if (= [:SP] pair)
+      (list
+       (assoc regs :SP (+ (* 256 hi-byte) low-byte) :PC (+ 3 addr))
+       mem
+       io)
+      (list
+       (assoc regs (first pair) hi-byte (second pair) low-byte :PC (+ 3 addr))
+       mem
+       io)
+      )))
+
+
 (defn- error-func [regs mem io]
   (throw (IllegalArgumentException. (str "Unrecognized instruction " (mem (regs :PC))))))
 
@@ -106,6 +124,7 @@
     (and (= 0x70 (bit-and 0xF8 instr)) (not (= 0x06 (bit-and 0x07 instr)))) mov-n-r
     (and (= 0x06 (bit-and 0xC7 instr)) (not (= 0x30 (bit-and 0x38 instr)))) mvi-r-d
     (= 0x36 instr) mvi-m-d
+    (= 0x01 (bit-and 0xCF instr)) lxi-rp-d
     :else error-func))
 
 

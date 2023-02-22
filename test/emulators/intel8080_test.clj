@@ -41,7 +41,7 @@
       (t/is (= 0x02 ((first next-state) :PC)))
       ))
 
-    (t/testing "immediate to memory"
+  (t/testing "immediate to memory"
     (let [ r (assoc sut/init-registers :H 0x00 :L 0x04)
           m [ 0x36 0xFF 0x01 0x02 0x03]
           io []
@@ -50,4 +50,22 @@
       (t/is (= 0x02 ((first next-state) :PC)))
       ))
 
+  (t/testing "load register pair"
+    (let [ r sut/init-registers
+          m [ 0x21 0x44 0x21 0x00 ]
+          io []
+          [r-out mem-out io-out] (sut/step r m io) ]
+      (t/is (= 0x03 (r-out :PC)))
+      (t/is (= 0x44 (r-out :L)))
+      (t/is (= 0x21 (r-out :H)))
+      )
+    (let [ r sut/init-registers
+          m [ 0x31 0x44 0x21 0x00 ]
+          io []
+          [r-out mem-out io-out] (sut/step r m io) ]
+      (t/is (= 0x03 (r-out :PC)))
+      (t/is (= 0x2144 (r-out :SP)))
+      ))
+  
+  
   )        
