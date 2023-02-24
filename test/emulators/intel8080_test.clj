@@ -136,3 +136,16 @@
       ))
          
   )        
+
+;;(t/deftest arithmetic-tests
+;;
+;;  (t/testing "addr"
+;;    (let [ r (assoc sut/init-registers :A 0x23 :L 0x32)
+;;          m [ 0x85 0x00 ]
+;;          io []
+;;          [r-out mem-out io-out] (sut/step r m io) ]
+;;      (t/is (= 0x55 (r-out :A)))
+;;      (t/is (= 0x01 (r-out :PC)))
+;;      ))
+;;  )
+;;

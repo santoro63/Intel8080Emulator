@@ -5,19 +5,13 @@
 ;; and performs the desired action on it.
 
 
-(def init-registers
-  "Returns a map of the CPU registers at startup (or after a reset"
-  {
-   :A 0 :FL 0
-   :B 0 :C 0
-   :D 0 :E 0
-   :H 0 :L 0
-   :SP 0
-   :PC 0
-   })
+;; initial value complex structures
+(def init-registers { :A 0 :B 0 :C 0 :D 0 :E 0 :H 0 :L 0 :SP 0 :PC 0 })
+(def init-flags { :Z 0 :S 0 :P 0 :CY 0 :AC 0 })
 
+
+;; maps for translating instruction codes to register/pairs
 (def register-map { 07 :A 00 :B 01 :C 02 :D 03 :E 04 :H 05 :L } )
-
 (def register-pair-map { 00 [:B :C] 01 [:D :E] 02 [:H :L] 03 [:SP] })
 
 
@@ -162,15 +156,30 @@
     (list
      (incr-pc regs 1)
      (assoc mem mem-addr (regs :A))
-     io)
-    ))
+     io)))
                                              
 (defn- xchg [regs mem io]
   (list
    (assoc regs :H (regs :D) :D (regs :H) :L (regs :E) :E (regs :L) :PC (+ 1 (regs :PC)))
    mem
-   io)
-  )
+   io))
+
+;; arithmetich group instructions
+
+(defn- addr [regs mem io]
+  (let [ reg-label (sss-reg (mem (regs :PC))) ]
+    (list
+     (assoc regs :A (+ (regs :A) (regs reg-label)) :PC (+ 1 (regs :PC)))
+     mem
+     io)))
+;; logical group instructions
+
+;; branch group instructions
+
+;; stack, io, machine control group instructions
+
+
+
 
 (defn- error-func [regs mem io]
   (throw (IllegalArgumentException. (str "Unrecognized instruction " (mem (regs :PC))))))
@@ -193,6 +202,7 @@
     (or (= 0x0A instr) (= 0x1A instr)) ldax
     (or (= 0x02 instr) (= 0x12 instr)) stax
     (= 0xEB instr) xchg
+    (and (= 0x80 (bit-and 0xF8 instr)) (not (= 0x86 (instr)))) addr
     :else error-func))
 
 
