@@ -49,51 +49,59 @@
 ;;------------------------------
 ;; Data Transfer Group
 ;;------------------------------
-(defn- mov-r1-r2 [ regs mem io ]
+(defn- mov-r1-r2 [ regs flags mem io ]
   (let [ instr (mem (regs :PC))
         ddd   (ddd-reg instr)
         sss   (sss-reg instr)]
-    (list (assoc regs ddd (regs sss) :PC (+ 1 (regs :PC)) mem io))))
+    (list
+     (assoc regs ddd (regs sss) :PC (+ 1 (regs :PC)))
+     flags
+     mem
+     io)))
 
 
-(defn- mov-r-n [regs mem io]
+(defn- mov-r-n [regs flags mem io]
   (let [ addr (get-long regs :H :L)
          ddd  (ddd-reg (mem (regs :PC)))]
     (list
      (assoc regs ddd (mem addr) :PC (+ 1 (regs :PC)))
+     flags
      mem
      io)))
 
-(defn- mov-n-r [regs mem io]
+(defn- mov-n-r [regs flags mem io]
   (let [ addr (get-long regs :H :L)
         sss  (sss-reg (mem (regs :PC)))
         ]
     (list
      (incr-pc regs)
+     flags
      (assoc mem addr (regs sss))
      io)))
 
 
-(defn- mvi-r-d [regs mem io]
+(defn- mvi-r-d [regs flags mem io]
   (let [ ddd (ddd-reg (mem (regs :PC)))
         val (mem (+ 1 (regs :PC)))
         ]
     (list
      (assoc regs ddd val :PC (+ 2 (regs :PC)))
+     flags
      mem
      io)))
         
-(defn- mvi-m-d [regs mem io]
+(defn- mvi-m-d [regs flags mem io]
   (let [ addr (get-long regs :H :L)
         val  (mem (+ 1 (regs :PC)))
         ]
     (list
      (incr-pc regs 2)
+     flags
      (assoc mem addr val)
      io)))
 
 
-(defn- lxi-rp-d [regs mem io]
+(defn- lxi-rp-d [regs flags mem io]
   (let [ addr (regs :PC)
         pair (get-rp (mem addr))
         low-byte (mem (+ 1 addr))
@@ -101,75 +109,85 @@
     (if (= [:SP] pair)
       (list
        (assoc regs :SP (to-long hi-byte low-byte) :PC (+ 3 addr))
+       flags
        mem
        io)
       (list
        (assoc regs (first pair) hi-byte (second pair) low-byte :PC (+ 3 addr))
+       flags
        mem
        io)
       )))
 
 
-(defn- lda-m [regs mem io]
+(defn- lda-m [regs flags mem io]
   (let [ addr (regs :PC)
         mem-addr (to-long (mem (+ 2 addr)) (mem (+ 1 addr))) ]
     (list
      (assoc regs :A (mem mem-addr) :PC (+ 3 addr))
+     flags
      mem
      io)))
 
-(defn- sta-m [regs mem io]
+(defn- sta-m [regs flags mem io]
   (let [ [instr low-byte high-byte] (instr3 mem (regs :PC)) ]
     (list
      (incr-pc regs 3)
+     flags
      (assoc mem (to-long high-byte low-byte) (regs :A))
      io)))
 
-(defn- lhld [regs mem io]
+(defn- lhld [regs flags mem io]
   (let [ [instr low-byte high-byte ] (instr3 mem (regs :PC))
         addr (to-long high-byte low-byte) ]
     (list
      (assoc regs :L (mem addr) :H (mem (+ 1 addr)) :PC (+ 3 (regs :PC)))
+     flags
      mem
      io)))
 
-(defn- shld [regs mem io]
+(defn- shld [regs flags mem io]
   (let [ [instr low-byte high-byte] (instr3 mem (regs :PC))
         mem-addr (to-long high-byte low-byte) ]
     (list
      (incr-pc regs 3)
+     flags
      (assoc mem mem-addr (regs :L) (+ 1 mem-addr) (regs :H))
      io)
     ))
 
-(defn- ldax [regs mem io]
+(defn- ldax [regs flags mem io]
   (let [ [labelH labelL] (get-rp (mem (regs :PC)))
         mem-addr (get-long regs labelH labelL) ]
     (list
      (assoc regs :A (mem mem-addr) :PC (+ 1 (regs :PC)))
+     flags
      mem
      io)))
 
-(defn- stax [regs mem io]
+(defn- stax [regs flags mem io]
   (let [ [labelH labelL] (get-rp (mem (regs :PC)))
         mem-addr (get-long regs labelH labelL) ]
     (list
      (incr-pc regs 1)
+     flags
      (assoc mem mem-addr (regs :A))
      io)))
                                              
-(defn- xchg [regs mem io]
+(defn- xchg [regs flags mem io]
   (list
    (assoc regs :H (regs :D) :D (regs :H) :L (regs :E) :E (regs :L) :PC (+ 1 (regs :PC)))
+   flags
    mem
    io))
 
 ;; arithmetich group instructions
 
-(defn- addr [regs mem io]
+(defn- addr [regs flags mem io]
   (let [ reg-label (sss-reg (mem (regs :PC))) ]
     (list
      (assoc regs :A (+ (regs :A) (regs reg-label)) :PC (+ 1 (regs :PC)))
+     flags
      mem
      io)))
 ;; logical group instructions
@@ -181,7 +199,7 @@
 
 
 
-(defn- error-func [regs mem io]
+(defn- error-func [regs flags mem io]
   (throw (IllegalArgumentException. (str "Unrecognized instruction " (mem (regs :PC))))))
 
 
@@ -209,11 +227,9 @@
   
 (defn step
   "Executes the current instruction on the CPU returning new register, memory and io states"
-  [ regs mem io ]
+  [ regs flags mem io ]
   (let [instruction (mem (regs :PC))]
-    ((instruction-dispatcher instruction) regs mem io)))
+    ((instruction-dispatcher instruction) regs flags mem io)))
 
 ;; collection of instructions
-
-
 
