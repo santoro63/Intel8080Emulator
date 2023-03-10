@@ -181,13 +181,35 @@
    mem
    io))
 
-;; arithmetich group instructions
+;;--------------------------------------------------
+;; Arithmetic Group
+;;--------------------------------------------------
+(defn bit-parity
+  ([byte-data]
+   (loop [ count 0 b-data byte-data ]
+     (if (= 0x00 b-data)
+       (if (= 0 (mod count 2)) 1 0)
+       (recur (+ count (bit-and 0x01 byte-data)) (bit-shift-right b-data 1))))))
 
-(defn- addr [regs flags mem io]
-  (let [ reg-label (sss-reg (mem (regs :PC))) ]
+
+(defn new-flags
+  "Return the new values for flags after operation."
+  [accum accum-old ]
+  { :Z (if (= 0 accum) 1 0)
+   :S (if (= 0x80 (bit-and 0x80 accum)) 1 0)
+   :P (bit-parity accum)
+   :CY (if (< accum accum-old) 1 0)
+   :AC (if (< (bit-and 0x0F accum) (bit-and 0x0F accum-old)) 1 0)
+   })
+
+
+(defn- add-r [regs flags mem io]
+  (let [ reg-label (sss-reg (mem (regs :PC)))
+        result (+ (regs :A) (regs reg-label))
+        ]
     (list
-     (assoc regs :A (+ (regs :A) (regs reg-label)) :PC (+ 1 (regs :PC)))
-     flags
+     (assoc regs :A result :PC (+ 1 (regs :PC)))
+     (new-flags result (regs :A))
      mem
      io)))
 ;; logical group instructions
@@ -220,7 +242,7 @@
     (or (= 0x0A instr) (= 0x1A instr)) ldax
     (or (= 0x02 instr) (= 0x12 instr)) stax
     (= 0xEB instr) xchg
-    (and (= 0x80 (bit-and 0xF8 instr)) (not (= 0x86 (instr)))) addr
+    (and (= 0x80 (bit-and 0xF8 instr)) (not (= 0x86 (instr)))) add-r
     :else error-func))
 
 
